@@ -12,8 +12,8 @@ pkg_check_modules(SPA REQUIRED libspa-0.2)
 # 添加可执行文件
 add_executable(ds5server
     src/main.cpp
-    src/audio.cpp
-    src/ds5.cpp
+    src/audio_sink.cpp
+    src/ds5server.cpp
 )
 
 # 包含目录

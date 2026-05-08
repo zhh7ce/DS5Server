@@ -1,4 +1,4 @@
-#include "ds5.h"
+#include "ds5server.h"
 #include <iostream>
 #include <csignal>
 #include <atomic>
@@ -31,8 +31,8 @@ int main()
     // 创建设备标识符
     std::string deviceId = "USB054c:0ce6";
     
-    // 创建 DS5 对象，传入设备标识符
-    auto ds5 = std::make_unique<DS5>(deviceId);
+    // 创建 DS5Server 对象，传入设备标识符
+    auto ds5 = std::make_unique<DS5Server>(deviceId);
 
     // 设置状态回调：当设备断开时，将 g_running 设为 false
     ds5->setStopCallback([&ds5]() {
@@ -40,9 +40,9 @@ int main()
         g_running = false;  // 触发退出
     });
 
-    // 初始化 DS5（会创建相同标识符的 Audio 对象）
+    // 初始化 DS5Server（会创建相同标识符的 Audio 对象）
     if (!ds5->initialize()) {
-        std::cerr << "Failed to initialize DS5" << std::endl;
+        std::cerr << "Failed to initialize DS5Server" << std::endl;
         return 1;
     }
 

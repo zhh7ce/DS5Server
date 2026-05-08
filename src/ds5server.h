@@ -1,13 +1,13 @@
 #pragma once
 
-#include "audio.h"
+#include "audio_sink.h"
 #include <string>
 #include <memory>
 #include <functional>
 #include <fstream>
 #include <vector>
 
-class DS5 {
+class DS5Server {
 public:
     // 状态变化回调
     using StopCallback = std::function<void()>;
@@ -16,12 +16,12 @@ public:
      * @brief 构造函数
      * @param deviceId 设备标识符，用于创建 Audio 对象
      */
-    explicit DS5(const std::string& deviceId);
+    explicit DS5Server(const std::string& deviceId);
     
-    ~DS5();
+    ~DS5Server();
 
     /**
-     * @brief 初始化 DS5 设备（创建 Audio 对象）
+     * @brief 初始化 DS5Server 设备（创建 Audio 对象）
      * @return 成功返回 true，失败返回 false
      */
     bool initialize();
@@ -59,6 +59,6 @@ public:
 
 private:
     std::string m_deviceId;
-    std::unique_ptr<Audio> m_audio;  // Audio 对象
+    std::unique_ptr<AudioSink> m_audioSink;  // AudioSink 对象
     StopCallback m_stopCallback;    // 状态回调
 };

@@ -1,11 +1,11 @@
-#include "audio.h"
+#include "audio_sink.h"
 #include <pipewire/pipewire.h>
 #include <spa/param/audio/format-utils.h>
 #include <iostream>
 #include <cstring>
 #include <cmath>
 
-Audio::Audio(const std::string& deviceId)
+AudioSink::AudioSink(const std::string& deviceId)
 {
     m_config.alsaComponents = deviceId;
     m_config.nodeName += deviceId;
@@ -13,12 +13,12 @@ Audio::Audio(const std::string& deviceId)
     m_config.nodeDescription += deviceId;
 }
 
-Audio::~Audio()
+AudioSink::~AudioSink()
 {
     stop();
 }
 
-bool Audio::start()
+bool AudioSink::start()
 {
     // 初始化 PipeWire
     pw_init(nullptr, nullptr);
@@ -107,7 +107,7 @@ bool Audio::start()
     struct spa_pod_builder podBuilder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     
     struct spa_audio_info_raw audioInfo = {};
-    audioInfo.format = SPA_AUDIO_FORMAT_F32_LE;
+    audioInfo.format = SPA_AUDIO_FORMAT_F32_LE;;
     audioInfo.rate = m_config.sampleRate;
     audioInfo.channels = m_config.channels;
     
@@ -154,14 +154,14 @@ bool Audio::start()
     // 启动后台线程运行 PipeWire 主循环
     m_stopRequested = false;  // 重置停止标志
     m_loopThread = std::thread([this]() {
-        std::cout << "[Audio] Background loop started (using pw_main_loop_run)" << std::endl;
+        std::cout << "[AudioSink] Background loop started (using pw_main_loop_run)" << std::endl;
         // 阻塞运行，直到 pw_main_loop_quit() 被调用
         pw_main_loop_run(m_loop);
-        std::cout << "[Audio] Background loop exited" << std::endl;
+        std::cout << "[AudioSink] Background loop exited" << std::endl;
         
         // 只有在非主动停止时才触发回调（表示异常断开）
         if (!m_stopRequested && m_stopCallback) {
-            std::cout << "[Audio] Triggering stop callback (unexpected disconnect)" << std::endl;
+            std::cout << "[AudioSink] Triggering stop callback (unexpected disconnect)" << std::endl;
             m_stopCallback();
         }
     });
@@ -169,69 +169,69 @@ bool Audio::start()
     return true;
 }
 
-void Audio::stop()
+void AudioSink::stop()
 {
-    std::cout << "[Audio::stop] Starting cleanup..." << std::endl;
+    std::cout << "[AudioSink::stop] Starting cleanup..." << std::endl;
     
     // 标记为主动请求停止
     m_stopRequested = true;
     
     // 停止后台线程
     if (m_loop) {
-        std::cout << "[Audio::stop] Calling pw_main_loop_quit()..." << std::endl;
+        std::cout << "[AudioSink::stop] Calling pw_main_loop_quit()..." << std::endl;
         pw_main_loop_quit(m_loop);  // 这会让 pw_main_loop_run() 返回
     }
     
     if (m_loopThread.joinable()) {
-        std::cout << "[Audio::stop] Waiting for background thread to join..." << std::endl;
+        std::cout << "[AudioSink::stop] Waiting for background thread to join..." << std::endl;
         m_loopThread.join();
-        std::cout << "[Audio::stop] Background thread joined" << std::endl;
+        std::cout << "[AudioSink::stop] Background thread joined" << std::endl;
     } else {
-        std::cout << "[Audio::stop] Background thread not running" << std::endl;
+        std::cout << "[AudioSink::stop] Background thread not running" << std::endl;
     }
 
     if (m_stream) {
-        std::cout << "[Audio::stop] Destroying stream..." << std::endl;
+        std::cout << "[AudioSink::stop] Destroying stream..." << std::endl;
         pw_stream_destroy(m_stream);
         m_stream = nullptr;
     }
 
     if (m_core) {
-        std::cout << "[Audio::stop] Disconnecting core..." << std::endl;
+        std::cout << "[AudioSink::stop] Disconnecting core..." << std::endl;
         pw_core_disconnect(m_core);
         m_core = nullptr;
     }
 
     if (m_loop) {
-        std::cout << "[Audio::stop] Destroying main loop..." << std::endl;
+        std::cout << "[AudioSink::stop] Destroying main loop..." << std::endl;
         pw_main_loop_destroy(m_loop);
         m_loop = nullptr;
     }
 
-    std::cout << "[Audio::stop] Deinitializing PipeWire..." << std::endl;
+    std::cout << "[AudioSink::stop] Deinitializing PipeWire..." << std::endl;
     pw_deinit();
     
-    std::cout << "[Audio::stop] Cleanup completed" << std::endl;
+    std::cout << "[AudioSink::stop] Cleanup completed" << std::endl;
 }
 
-void Audio::setupConfig()
+void AudioSink::setupConfig()
 {
 
 }
 
-void Audio::setStopCallback(StopCallback callback)
+void AudioSink::setStopCallback(StopCallback callback)
 {
     m_stopCallback = std::move(callback);
 }
 
-void Audio::setAudioDataCallback(AudioDataCallback callback)
+void AudioSink::setAudioSinkDataCallback(AudioSinkDataCallback callback)
 {
-    m_audioDataCallback = std::move(callback);
+    m_audioSinkDataCallback = std::move(callback);
 }
 
-void Audio::onStreamProcess(void* userdata)
+void AudioSink::onStreamProcess(void* userdata)
 {
-    Audio* self = static_cast<Audio*>(userdata);
+    AudioSink* self = static_cast<AudioSink*>(userdata);
     if (!self || !self->m_stream) {
         return;
     }
@@ -255,14 +255,14 @@ void Audio::onStreamProcess(void* userdata)
     float* data = static_cast<float*>(spaBuffer->datas[0].data);
 
     // 通过回调传递音频数据
-    if (self->m_audioDataCallback) {
-        self->m_audioDataCallback(data, nFrames, self->m_config.channels);
+    if (self->m_audioSinkDataCallback) {
+        self->m_audioSinkDataCallback(data, nFrames, self->m_config.channels);
     }
     
     pw_stream_queue_buffer(self->m_stream, buffer);
 }
 
-void Audio::onStreamParamChanged(void* userdata, uint32_t id, const struct spa_pod* param)
+void AudioSink::onStreamParamChanged(void* userdata, uint32_t id, const struct spa_pod* param)
 {
     // 参数变化处理（可选）
     (void)userdata;
@@ -270,15 +270,15 @@ void Audio::onStreamParamChanged(void* userdata, uint32_t id, const struct spa_p
     (void)param;
 }
 
-void Audio::onStreamStateChanged(void* userdata, enum pw_stream_state old,
+void AudioSink::onStreamStateChanged(void* userdata, enum pw_stream_state old,
                                  enum pw_stream_state state, const char* error)
 {
-    Audio* self = static_cast<Audio*>(userdata);
+    AudioSink* self = static_cast<AudioSink*>(userdata);
     if (!self) {
         return;
     }
 
-    std::cout << "[Audio] Stream state changed: ";
+    std::cout << "[AudioSink] Stream state changed: ";
     
     switch (state) {
         case PW_STREAM_STATE_UNCONNECTED:
@@ -302,7 +302,7 @@ void Audio::onStreamStateChanged(void* userdata, enum pw_stream_state old,
     // 如果状态变为未连接或错误，触发停止
     if (state == PW_STREAM_STATE_UNCONNECTED || 
         state == PW_STREAM_STATE_ERROR) {
-        std::cerr << "[Audio] Stream disconnected or error: " 
+        std::cerr << "[AudioSink] Stream disconnected or error: " 
                   << (error ? error : "unknown") << std::endl;
         
         if (self->m_stopCallback) {
