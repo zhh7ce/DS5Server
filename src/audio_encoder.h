@@ -113,6 +113,6 @@ private:
 
     // 内部方法
     void encodeLoop();
-    void resample(std::vector<float>& input, std::vector<float>& output, float ratio);
+    size_t resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum);
     void convertToInt8(std::vector<float>& input, std::vector<int8_t>& output);
 };

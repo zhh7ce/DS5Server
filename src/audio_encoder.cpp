@@ -48,7 +48,7 @@ bool AudioEncoder::init(uint32_t sampleRate,
     m_opusEncoder = opus_encoder_create(
         audioSampleRate,
         audioChannels,
-        OPUS_APPLICATION_AUDIO,
+        OPUS_APPLICATION_RESTRICTED_LOWDELAY,
         &error
     );
 
@@ -59,8 +59,8 @@ bool AudioEncoder::init(uint32_t sampleRate,
     }
 
     // 配置 Opus 编码器参数（仿照 sample/audio.cpp）
-    opus_encoder_ctl(m_opusEncoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_10_MS));
-    opus_encoder_ctl(m_opusEncoder, OPUS_SET_BITRATE(static_cast<opus_int32>(bitrate)));
+    opus_encoder_ctl(m_opusEncoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_2_5_MS));
+    opus_encoder_ctl(m_opusEncoder, OPUS_SET_BITRATE(bitrate));
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_VBR(false));
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_COMPLEXITY(0));  // 最低复杂度
 
@@ -176,8 +176,8 @@ void AudioEncoder::encodeLoop() {
     std::vector<float> sampledHapticsBuffer;
 
     //编码数据
-    std::vector<uint8_t> encodeAudioBuffer;
-    std::vector<int8_t> encodeHapticsBuffer;
+    std::vector<uint8_t> encodeAudioBuffer(MAX_AUDIO_SIZE);
+    std::vector<int8_t> encodeHapticsBuffer(MAX_HAPTIC_SIZE);
 
     while (m_running) {
         // 从队列获取数据
@@ -209,16 +209,20 @@ void AudioEncoder::encodeLoop() {
         while (audioBuffer.size() >= 512 * 2) {
 
             //将音频数据重采样为480 samples
-            resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO);
-            
+            size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
+            encodeAudioBuffer.resize(MAX_AUDIO_SIZE * resampledBatch);
+
             // 从累积缓冲区取出足够的数据进行编码
             int encodedBytes = opus_encode_float(
                 m_opusEncoder,
                 sampledAudioBuffer.data(),
-                480,
+                480 * resampledBatch,
                 encodeAudioBuffer.data(),
-                MAX_OUTPUT_AUDIO_SIZE
+                encodeAudioBuffer.size()
             );
+
+            sampledAudioBuffer.clear();
+            //sampledAudioBuffer.erase(sampledAudioBuffer.begin(), sampledAudioBuffer.begin() + 480 * 2);
 
             if (encodedBytes > 0) {
                 // 将编码后的数据放入队列
@@ -247,7 +251,7 @@ void AudioEncoder::encodeLoop() {
         // 重采样触觉数据（只有当缓冲区有足够数据时）
         // 48 samples @ 48kHz = 1ms，重采样到 3kHz 后约为 3 samples
         if (hapticsBuffer.size() >= 48 * 2) {
-            resample(hapticsBuffer, sampledHapticsBuffer, HAPTIC_RESAMPLE_RATIO);
+            resample(hapticsBuffer, sampledHapticsBuffer, HAPTIC_RESAMPLE_RATIO, 48, 3);
             convertToInt8(sampledHapticsBuffer, encodeHapticsBuffer);
             
             if (!encodeHapticsBuffer.empty()) {
@@ -269,20 +273,23 @@ void AudioEncoder::encodeLoop() {
     std::cout << "[AudioEncoder] Encode thread exited" << std::endl;
 }
 
-void AudioEncoder::resample(std::vector<float>& input, std::vector<float>& output, float ratio) {
-    if (input.empty() || ratio == 0) {
-        return;
+size_t AudioEncoder::resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum) {
+    const size_t channels = m_config.audioChannels;
+    size_t batch = input.size() / channels / inputBatchNum;
+
+    if (input.empty() || batch == 0 || ratio == 0) {
+        return 0;
     }
 
-    const size_t channels = m_config.audioChannels;
-    const size_t inputFrames = input.size() / channels;
-    const size_t outputFrames = static_cast<size_t>(std::ceil(inputFrames * ratio));
-    output.resize(outputFrames * channels);
+    const size_t inputFrames = batch * inputBatchNum;
+    const size_t outputFrames = batch * outputBatchNum;
+    const size_t outputOffset = output.size();
+    output.resize(outputOffset + outputFrames * channels);
 
     // 设置重采样参数
     SRC_DATA srcData;
     srcData.data_in = input.data();
-    srcData.data_out = output.data();
+    srcData.data_out = output.data() + outputOffset;
     srcData.input_frames = inputFrames;
     srcData.output_frames = outputFrames;
     srcData.src_ratio = ratio;
@@ -296,14 +303,15 @@ void AudioEncoder::resample(std::vector<float>& input, std::vector<float>& outpu
     }
 
     input.erase(input.begin(), input.begin() + inputFrames * channels);
+    return batch;
 }
 
 void AudioEncoder::convertToInt8(std::vector<float>& input, std::vector<int8_t>& output) {
+    output.resize(output.size() + input.size());
     for (size_t i = 0; i < input.size(); i++) {
         // 应用增益并限制范围 [-128, 127]
         float val = input[i] * 127.0f;
-        val = std::clamp(val, -128.0f, 127.0f);
-        output[i] = static_cast<int8_t>(val);
+        output[i] = std::clamp(val, -128.0f, 127.0f);
     }
 
     input.clear();

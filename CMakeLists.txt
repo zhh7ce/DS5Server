@@ -51,4 +51,6 @@ target_compile_options(ds5server PRIVATE
     -Wall 
     -Wextra 
     -Wpedantic
+    -g              # 添加调试符号
+    -O0             # 关闭优化，方便调试
 )
