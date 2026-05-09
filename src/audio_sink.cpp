@@ -107,7 +107,7 @@ bool AudioSink::start()
     struct spa_pod_builder podBuilder = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
     
     struct spa_audio_info_raw audioInfo = {};
-    audioInfo.format = SPA_AUDIO_FORMAT_F32_LE;;
+    audioInfo.format = SPA_AUDIO_FORMAT_F32_LE;
     audioInfo.rate = m_config.sampleRate;
     audioInfo.channels = m_config.channels;
     
@@ -212,11 +212,6 @@ void AudioSink::stop()
     pw_deinit();
     
     std::cout << "[AudioSink::stop] Cleanup completed" << std::endl;
-}
-
-void AudioSink::setupConfig()
-{
-
 }
 
 void AudioSink::setStopCallback(StopCallback callback)

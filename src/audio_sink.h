@@ -76,7 +76,6 @@ private:
     std::atomic<bool> m_stopRequested{false};  // 是否请求停止（用于区分主动/被动停止）
 
     // 内部方法
-    void setupConfig();
     static void onStreamStateChanged(void* userdata, enum pw_stream_state old, 
                                      enum pw_stream_state state, const char* error);
     static void onStreamProcess(void* userdata);

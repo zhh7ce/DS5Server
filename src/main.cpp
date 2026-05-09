@@ -23,9 +23,6 @@ int main()
     std::signal(SIGINT, signalHandler);
     std::signal(SIGTERM, signalHandler);
 
-    // 将 stderr 重定向到 /dev/null，避免干扰 stdout 的音频数据
-    freopen("/dev/null", "w", stderr);
-
     std::cout << "=== PipeWire Virtual Audio Sink Demo ===" << std::endl;
 
     // 创建设备标识符
