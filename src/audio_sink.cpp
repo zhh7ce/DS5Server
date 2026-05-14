@@ -63,6 +63,11 @@ bool AudioSink::start()
         PW_KEY_DEVICE_ICON_NAME, "audio-card",
         "alsa.components", m_config.alsaComponents.c_str(),
         "node.volume", "1.0",
+        // 低延迟优化配置
+        "node.latency", "48/48000",  // 设置最小延迟：48帧 @ 48kHz = 1ms
+        "clock.quantum", "48",        // 最小量子大小
+        "clock.min-quantum", "48",    // 最小量子
+        "clock.max-quantum", "1024",  // 最大量子
         nullptr
     );
 
