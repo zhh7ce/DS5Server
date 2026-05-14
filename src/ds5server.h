@@ -51,7 +51,7 @@ public:
     void setStopCallback(StopCallback callback);
 
     /**
-     * @brief 测试方法：作为音频数据回调使用
+     * @brief 处理音频数据
      * @param data 音频数据指针
      * @param frames 帧数
      * @param channels 通道数

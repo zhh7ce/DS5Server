@@ -33,7 +33,7 @@ bool DS5Server::initialize()
             return false;
         }
 
-        // 初始化 AudioEncoder（48kHz, 2通道, 3kHz触觉, 16kbps码率）
+        // 初始化 AudioEncoder（48kHz, 2通道, 3kHz触觉, 160kbps码率）
         if (!m_audioEncoder->init()) {
             std::cerr << "[DS5Server] Failed to initialize AudioEncoder" << std::endl;
             // 清理已分配的资源

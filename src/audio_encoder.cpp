@@ -9,9 +9,9 @@
 const size_t MAX_AUDIO_SIZE = 200;
 const size_t MAX_HAPTIC_SIZE = 64;
 
-const size_t MAX_INPUT_SIZE = 48 * 2 * 33; // 48 samples * 2 channels * 22 frames
-const size_t MAX_OUTPUT_AUDIO_SIZE = MAX_AUDIO_SIZE * 3;
-const size_t MAX_OUTPUT_HAPTIC_SIZE = MAX_HAPTIC_SIZE * 3;
+const size_t MAX_INPUT_SIZE = 48 * 2 * 3300; // 48 samples * 2 channels * 22 frames
+const size_t MAX_OUTPUT_AUDIO_SIZE = MAX_AUDIO_SIZE * 300;
+const size_t MAX_OUTPUT_HAPTIC_SIZE = MAX_HAPTIC_SIZE * 300;
 
 const float AUDIO_RESAMPLE_RATIO = 480.0f / 512.0f;
 const float HAPTIC_RESAMPLE_RATIO = 3.0f / 48.0f;
@@ -59,7 +59,7 @@ bool AudioEncoder::init(uint32_t sampleRate,
     }
 
     // 配置 Opus 编码器参数（仿照 sample/audio.cpp）
-    opus_encoder_ctl(m_opusEncoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_2_5_MS));
+    opus_encoder_ctl(m_opusEncoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_10_MS));
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_BITRATE(bitrate));
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_VBR(false));
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_COMPLEXITY(0));  // 最低复杂度
@@ -193,8 +193,6 @@ void AudioEncoder::encodeLoop() {
 
             size_t frameCount = m_inputBuffer.size() / m_config.totalChannels;
             
-            audioBuffer.resize(audioBuffer.size() + frameCount * 2);
-            hapticsBuffer.resize(hapticsBuffer.size() + frameCount * 2);
             for (uint32_t i = 0; i < frameCount; i++) {
                 audioBuffer.push_back(m_inputBuffer[i * m_config.totalChannels]);         // Left (ch0)
                 audioBuffer.push_back(m_inputBuffer[i * m_config.totalChannels + 1]);     // Right (ch1)
@@ -209,43 +207,44 @@ void AudioEncoder::encodeLoop() {
         while (audioBuffer.size() >= 512 * 2) {
 
             //将音频数据重采样为480 samples
-            size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
-            encodeAudioBuffer.resize(MAX_AUDIO_SIZE * resampledBatch);
+            //size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
+            
+            size_t resampledBatch = audioBuffer.size() / (480 * 2);
 
-            // 从累积缓冲区取出足够的数据进行编码
-            int encodedBytes = opus_encode_float(
-                m_opusEncoder,
-                sampledAudioBuffer.data(),
-                480 * resampledBatch,
-                encodeAudioBuffer.data(),
-                encodeAudioBuffer.size()
-            );
+            for (size_t i = 0; i < resampledBatch; i++) {
+                // 从累积缓冲区取出足够的数据进行编码
+                int encodedBytes = opus_encode_float(
+                    m_opusEncoder,
+                    sampledAudioBuffer.data() + i * 480 * 2,
+                    480,
+                    encodeAudioBuffer.data(),
+                    encodeAudioBuffer.size()
+                );
 
-            sampledAudioBuffer.clear();
-            //sampledAudioBuffer.erase(sampledAudioBuffer.begin(), sampledAudioBuffer.begin() + 480 * 2);
+                if (encodedBytes > 0) {
+                    // 将编码后的数据放入队列
+                    {
+                        std::lock_guard<std::mutex> lock(m_outputAudioMutex);
+                        m_outputAudioBuffer.insert(m_outputAudioBuffer.end(), encodeAudioBuffer.begin(), encodeAudioBuffer.end());
+                    }
 
-            if (encodedBytes > 0) {
-                // 将编码后的数据放入队列
-                {
-                    std::lock_guard<std::mutex> lock(m_outputAudioMutex);
-                    m_outputAudioBuffer.insert(m_outputAudioBuffer.end(), encodeAudioBuffer.begin(), encodeAudioBuffer.end());
+                    // 如果启用了文件输出，使用 OpusOutput 写入数据包
+                    if (m_opusOutput.isOpen()) {
+                        m_opusOutput.writePacket(encodeAudioBuffer.data(), encodedBytes, m_config.frameSize);
+                    }
+
+                    // 触发回调
+                    if (m_encodeCallback) {
+                        m_encodeCallback();
+                    }
+                } else {
+                    std::cerr << "[AudioEncoder] Opus encode failed: "
+                            << opus_strerror(encodedBytes) << std::endl;
                 }
-
-                // 如果启用了文件输出，使用 OpusOutput 写入数据包
-                if (m_opusOutput.isOpen()) {
-                    m_opusOutput.writePacket(encodeAudioBuffer.data(), encodedBytes, m_config.frameSize);
-                }
-
-                encodeAudioBuffer.clear();
-
-                // 触发回调
-                if (m_encodeCallback) {
-                    m_encodeCallback();
-                }
-            } else {
-                std::cerr << "[AudioEncoder] Opus encode failed: "
-                          << opus_strerror(encodedBytes) << std::endl;
             }
+
+            audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + 480 * 2 * resampledBatch);
+            //sampledAudioBuffer.clear();
         }
         
         // 重采样触觉数据（只有当缓冲区有足够数据时）

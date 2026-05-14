@@ -38,7 +38,7 @@ public:
               uint32_t totalChannels = 4,
               uint32_t audioChannels = 2,
               uint32_t audioSampleRate = 48000,
-              uint32_t bitrate = 16000,
+              uint32_t bitrate = 200 * 8 * 100,
               uint32_t hapticsSampleRate = 3000,
               uint32_t frameSize = 480);
 
@@ -81,9 +81,9 @@ private:
         uint32_t totalChannels = 4;
         uint32_t audioChannels = 2;
         uint32_t audioSampleRate = 48000;
-        uint32_t bitrate = 16000;
+        uint32_t bitrate = 200 * 8 * 100;
         uint32_t hapticsSampleRate = 3000;
-        uint32_t frameSize = 48;
+        uint32_t frameSize = 480;
     } m_config;
 
     // Opus 编码器
@@ -115,4 +115,8 @@ private:
     void encodeLoop();
     size_t resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum);
     void convertToInt8(std::vector<float>& input, std::vector<int8_t>& output);
+
+protected:
+    // 测试友元类
+    friend class AudioEncoderTestable;
 };
