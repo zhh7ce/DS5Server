@@ -208,9 +208,6 @@ void AudioEncoder::encodeLoop() {
 
             //将音频数据重采样为480 samples
             size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
-            
-            //size_t resampledBatch = audioBuffer.size() / (480 * 2);
-
             for (size_t i = 0; i < resampledBatch; i++) {
                 // 从累积缓冲区取出足够的数据进行编码
                 int encodedBytes = opus_encode_float(
@@ -242,8 +239,6 @@ void AudioEncoder::encodeLoop() {
                             << opus_strerror(encodedBytes) << std::endl;
                 }
             }
-
-            //audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + 480 * 2 * resampledBatch);
             sampledAudioBuffer.clear();
         }
         
@@ -300,8 +295,16 @@ size_t AudioEncoder::resample(std::vector<float>& input, std::vector<float>& out
         std::cerr << "[AudioEncoder] SRC process failed: "
                   << src_strerror(error) << std::endl;
     }
-
-    input.erase(input.begin(), input.begin() + inputFrames * channels);
+    
+    // 根据实际使用的输入帧数来erase，而不是预期的inputFrames
+    size_t actualInputFramesUsed = srcData.input_frames_used;
+    if (actualInputFramesUsed > 0 && actualInputFramesUsed <= inputFrames) {
+        input.erase(input.begin(), input.begin() + actualInputFramesUsed * channels);
+    } else {
+        // 如果SRC没有报告使用的帧数，使用预期值
+        input.erase(input.begin(), input.begin() + inputFrames * channels);
+    }
+    
     return batch;
 }
 
