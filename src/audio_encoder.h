@@ -77,7 +77,8 @@ public:
 protected:
     // 内部方法（protected 以便测试类访问）
     void encodeLoop();
-    size_t resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum);
+    size_t resampleAudio(std::vector<float>& input, std::vector<float>& output);
+    size_t resampleHaptics(std::vector<float>& input, std::vector<float>& output);
     void convertToInt8(std::vector<float>& input, std::vector<int8_t>& output);
 
 private:
@@ -95,8 +96,9 @@ private:
     // Opus 编码器
     OpusEncoder* m_opusEncoder = nullptr;
 
-    // libsamplerate 状态（用于触觉数据重采样）
-    void* m_srcState = nullptr;  // SRC_STATE*
+    // libsamplerate 状态（音频和触觉分别使用独立的 state）
+    void* m_audioSrcState = nullptr;   // SRC_STATE* for audio (512 -> 480)
+    void* m_hapticsSrcState = nullptr; // SRC_STATE* for haptics (48 -> 3)
 
     // 线程和队列
     std::thread m_encodeThread;

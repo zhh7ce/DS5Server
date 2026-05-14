@@ -2,18 +2,20 @@
 #include "audio_encoder.h"
 #include <vector>
 #include <cmath>
+#include <fstream>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-// 测试 AudioEncoder::resample 函数
+// 测试 AudioEncoder::resampleAudio 和 resampleHaptics 函数
 class AudioEncoderResampleTest : public ::testing::Test {
 protected:
     // 创建一个可测试的派生类
     class TestableAudioEncoder : public AudioEncoder {
     public:
-        using AudioEncoder::resample;
+        using AudioEncoder::resampleAudio;
+        using AudioEncoder::resampleHaptics;
     };
 
     void SetUp() override {
@@ -38,8 +40,8 @@ TEST_F(AudioEncoderResampleTest, AudioResampling) {
     std::vector<float> input(512 * 2, 0.5f);  // 512 frames, 2 channels
     std::vector<float> output;
     
-    // 调用 resample 方法：512 -> 480，比例 480/512
-    size_t batches = encoder->resample(input, output, 480.0f / 512.0f, 512, 480);
+    // 调用 resampleAudio 方法：512 -> 480
+    size_t batches = encoder->resampleAudio(input, output);
     
     // 验证结果
     EXPECT_EQ(batches, 1u);
@@ -52,8 +54,8 @@ TEST_F(AudioEncoderResampleTest, HapticsResampling) {
     std::vector<float> input(48 * 2, 0.5f);  // 48 frames, 2 channels
     std::vector<float> output;
     
-    // 调用 resample 方法：48 -> 3，比例 3/48
-    size_t batches = encoder->resample(input, output, 3.0f / 48.0f, 48, 3);
+    // 调用 resampleHaptics 方法：48 -> 3
+    size_t batches = encoder->resampleHaptics(input, output);
     
     // 验证结果
     EXPECT_EQ(batches, 1u);
@@ -61,25 +63,37 @@ TEST_F(AudioEncoderResampleTest, HapticsResampling) {
     EXPECT_TRUE(input.empty());  // 输入应该被清空
 }
 
-// 测试空输入
-TEST_F(AudioEncoderResampleTest, EmptyInput) {
+// 测试空输入 - 音频
+TEST_F(AudioEncoderResampleTest, EmptyInputAudio) {
     std::vector<float> input = {};
     std::vector<float> output;
     
     // 应该返回 0
-    size_t batches = encoder->resample(input, output, 0.5f, 100, 50);
+    size_t batches = encoder->resampleAudio(input, output);
     
     EXPECT_EQ(batches, 0u);
     EXPECT_TRUE(output.empty());
 }
 
-// 测试不同批次大小
-TEST_F(AudioEncoderResampleTest, MultipleBatches) {
+// 测试空输入 - 触觉
+TEST_F(AudioEncoderResampleTest, EmptyInputHaptics) {
+    std::vector<float> input = {};
+    std::vector<float> output;
+    
+    // 应该返回 0
+    size_t batches = encoder->resampleHaptics(input, output);
+    
+    EXPECT_EQ(batches, 0u);
+    EXPECT_TRUE(output.empty());
+}
+
+// 测试不同批次大小 - 音频
+TEST_F(AudioEncoderResampleTest, MultipleBatchesAudio) {
     // 测试多个批次的重采样：3个批次，每个批次512 frames
     std::vector<float> input(512 * 2 * 3, 0.5f);  // 3 batches
     std::vector<float> output;
     
-    size_t batches = encoder->resample(input, output, 480.0f / 512.0f, 512, 480);
+    size_t batches = encoder->resampleAudio(input, output);
     
     // 验证结果
     EXPECT_EQ(batches, 3u);
@@ -87,12 +101,12 @@ TEST_F(AudioEncoderResampleTest, MultipleBatches) {
     EXPECT_TRUE(input.empty());
 }
 
-// 测试边界情况：刚好一个批次
-TEST_F(AudioEncoderResampleTest, SingleBatch) {
+// 测试边界情况：刚好一个批次 - 音频
+TEST_F(AudioEncoderResampleTest, SingleBatchAudio) {
     std::vector<float> input(512 * 2, 1.0f);  // 正好一个批次
     std::vector<float> output;
     
-    size_t batches = encoder->resample(input, output, 480.0f / 512.0f, 512, 480);
+    size_t batches = encoder->resampleAudio(input, output);
     
     EXPECT_EQ(batches, 1u);
     EXPECT_EQ(output.size(), 480 * 2);
@@ -121,7 +135,7 @@ TEST_F(AudioEncoderResampleTest, SineWaveResampling) {
     std::vector<float> output;
     
     // 执行重采样
-    size_t batches = encoder->resample(input, output, resampleRatio, inputFrames, outputFrames);
+    size_t batches = encoder->resampleAudio(input, output);
     
     // 验证基本属性
     EXPECT_EQ(batches, 1u);
@@ -226,7 +240,7 @@ TEST_F(AudioEncoderResampleTest, SineWaveResamplingWithFileOutput) {
 
     
     // 执行重采样
-    size_t batches = encoder->resample(input, output, resampleRatio, inputFrames, outputFrames);
+    size_t batches = encoder->resampleAudio(input, output);
     
     // 验证基本属性
     EXPECT_EQ(batches, 1u);

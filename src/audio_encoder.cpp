@@ -64,12 +64,21 @@ bool AudioEncoder::init(uint32_t sampleRate,
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_VBR(false));
     opus_encoder_ctl(m_opusEncoder, OPUS_SET_COMPLEXITY(0));  // 最低复杂度
 
-    // 初始化 libsamplerate（使用最快的线性插值）
-    int srcError = 0;
-    m_srcState = src_new(SRC_LINEAR, audioChannels, &srcError);
-    if (srcError != 0) {
-        std::cerr << "[AudioEncoder] Failed to create SRC state: "
-                  << src_strerror(srcError) << std::endl;
+    // 初始化 libsamplerate - 音频重采样（512帧 -> 480帧）
+    int audioSrcError = 0;
+    m_audioSrcState = src_new(SRC_LINEAR, audioChannels, &audioSrcError);
+    if (audioSrcError != 0) {
+        std::cerr << "[AudioEncoder] Failed to create audio SRC state: "
+                  << src_strerror(audioSrcError) << std::endl;
+        return false;
+    }
+
+    // 初始化 libsamplerate - 触觉重采样（48帧 @48kHz -> 3帧 @3kHz）
+    int hapticsSrcError = 0;
+    m_hapticsSrcState = src_new(SRC_LINEAR, audioChannels, &hapticsSrcError);
+    if (hapticsSrcError != 0) {
+        std::cerr << "[AudioEncoder] Failed to create haptics SRC state: "
+                  << src_strerror(hapticsSrcError) << std::endl;
         return false;
     }
 
@@ -155,10 +164,16 @@ void AudioEncoder::stop() {
         m_opusEncoder = nullptr;
     }
 
-    // 清理 libsamplerate 资源
-    if (m_srcState) {
-        src_delete(static_cast<SRC_STATE*>(m_srcState));
-        m_srcState = nullptr;
+    // 清理音频重采样 state
+    if (m_audioSrcState) {
+        src_delete(static_cast<SRC_STATE*>(m_audioSrcState));
+        m_audioSrcState = nullptr;
+    }
+
+    // 清理触觉重采样 state
+    if (m_hapticsSrcState) {
+        src_delete(static_cast<SRC_STATE*>(m_hapticsSrcState));
+        m_hapticsSrcState = nullptr;
     }
 
     std::cout << "[AudioEncoder] Stopped" << std::endl;
@@ -203,11 +218,11 @@ void AudioEncoder::encodeLoop() {
             m_inputBuffer.erase_begin(frameCount * m_config.totalChannels);
         }
 
-        // Step 3: Opus 编码 每32/3s处理一次        
+        // Step 3: Opus 编码
         while (audioBuffer.size() >= 512 * 2) {
-
-            //将音频数据重采样为480 samples
-            size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
+            // 重采样音频数据：512帧 -> 480帧
+            size_t resampledBatch = resampleAudio(audioBuffer, sampledAudioBuffer);
+            
             for (size_t i = 0; i < resampledBatch; i++) {
                 // 从累积缓冲区取出足够的数据进行编码
                 int encodedBytes = opus_encode_float(
@@ -245,7 +260,7 @@ void AudioEncoder::encodeLoop() {
         // 重采样触觉数据（只有当缓冲区有足够数据时）
         // 48 samples @ 48kHz = 1ms，重采样到 3kHz 后约为 3 samples
         if (hapticsBuffer.size() >= 48 * 2) {
-            resample(hapticsBuffer, sampledHapticsBuffer, HAPTIC_RESAMPLE_RATIO, 48, 3);
+            resampleHaptics(hapticsBuffer, sampledHapticsBuffer);
             convertToInt8(sampledHapticsBuffer, encodeHapticsBuffer);
             
             if (!encodeHapticsBuffer.empty()) {
@@ -267,8 +282,12 @@ void AudioEncoder::encodeLoop() {
     std::cout << "[AudioEncoder] Encode thread exited" << std::endl;
 }
 
-size_t AudioEncoder::resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum) {
+size_t AudioEncoder::resampleAudio(std::vector<float>& input, std::vector<float>& output) {
     const size_t channels = m_config.audioChannels;
+    const size_t inputBatchNum = 512;
+    const size_t outputBatchNum = 480;
+    const float ratio = AUDIO_RESAMPLE_RATIO;  // 480/512
+    
     size_t batch = input.size() / channels / inputBatchNum;
 
     if (input.empty() || batch == 0 || ratio == 0) {
@@ -289,19 +308,62 @@ size_t AudioEncoder::resample(std::vector<float>& input, std::vector<float>& out
     srcData.src_ratio = ratio;
     srcData.end_of_input = 0;  // 还有更多数据
 
-    // 执行重采样
-    int error = src_process(static_cast<SRC_STATE*>(m_srcState), &srcData);
+    // 执行重采样（使用音频专用的 state）
+    int error = src_process(static_cast<SRC_STATE*>(m_audioSrcState), &srcData);
     if (error != 0) {
-        std::cerr << "[AudioEncoder] SRC process failed: "
+        std::cerr << "[AudioEncoder] Audio SRC process failed: "
                   << src_strerror(error) << std::endl;
     }
     
-    // 根据实际使用的输入帧数来erase，而不是预期的inputFrames
+    // 根据实际使用的输入帧数来erase
     size_t actualInputFramesUsed = srcData.input_frames_used;
     if (actualInputFramesUsed > 0 && actualInputFramesUsed <= inputFrames) {
         input.erase(input.begin(), input.begin() + actualInputFramesUsed * channels);
     } else {
-        // 如果SRC没有报告使用的帧数，使用预期值
+        input.erase(input.begin(), input.begin() + inputFrames * channels);
+    }
+    
+    return batch;
+}
+
+size_t AudioEncoder::resampleHaptics(std::vector<float>& input, std::vector<float>& output) {
+    const size_t channels = m_config.audioChannels;
+    const size_t inputBatchNum = 48;
+    const size_t outputBatchNum = 3;
+    const float ratio = HAPTIC_RESAMPLE_RATIO;  // 3/48
+    
+    size_t batch = input.size() / channels / inputBatchNum;
+
+    if (input.empty() || batch == 0 || ratio == 0) {
+        return 0;
+    }
+
+    const size_t inputFrames = batch * inputBatchNum;
+    const size_t outputFrames = batch * outputBatchNum;
+    const size_t outputOffset = output.size();
+    output.resize(outputOffset + outputFrames * channels);
+
+    // 设置重采样参数
+    SRC_DATA srcData;
+    srcData.data_in = input.data();
+    srcData.data_out = output.data() + outputOffset;
+    srcData.input_frames = inputFrames;
+    srcData.output_frames = outputFrames;
+    srcData.src_ratio = ratio;
+    srcData.end_of_input = 0;  // 还有更多数据
+
+    // 执行重采样（使用触觉专用的 state）
+    int error = src_process(static_cast<SRC_STATE*>(m_hapticsSrcState), &srcData);
+    if (error != 0) {
+        std::cerr << "[AudioEncoder] Haptics SRC process failed: "
+                  << src_strerror(error) << std::endl;
+    }
+    
+    // 根据实际使用的输入帧数来erase
+    size_t actualInputFramesUsed = srcData.input_frames_used;
+    if (actualInputFramesUsed > 0 && actualInputFramesUsed <= inputFrames) {
+        input.erase(input.begin(), input.begin() + actualInputFramesUsed * channels);
+    } else {
         input.erase(input.begin(), input.begin() + inputFrames * channels);
     }
     
