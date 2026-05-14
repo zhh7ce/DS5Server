@@ -31,7 +31,7 @@ public:
      * @param audioSampleRate 音频采样率（默认 48000）
      * @param audioChannels 音频通道数（默认 2）
      * @param hapticsSampleRate 触觉数据采样率（默认 3000）
-     * @param bitrate 编码码率（bps，默认 16000）
+     * @param bitrate 编码码率（bps，默认 160000）
      * @return 成功返回 true，失败返回 false
      */
     bool init(uint32_t sampleRate = 48000,
@@ -74,6 +74,12 @@ public:
      */
     void stop();
 
+protected:
+    // 内部方法（protected 以便测试类访问）
+    void encodeLoop();
+    size_t resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum);
+    void convertToInt8(std::vector<float>& input, std::vector<int8_t>& output);
+
 private:
     // 编码器配置
     struct Config {
@@ -110,13 +116,4 @@ private:
 
     // Ogg Opus 文件输出
     OpusOutput m_opusOutput;
-
-    // 内部方法
-    void encodeLoop();
-    size_t resample(std::vector<float>& input, std::vector<float>& output, float ratio, size_t inputBatchNum, size_t outputBatchNum);
-    void convertToInt8(std::vector<float>& input, std::vector<int8_t>& output);
-
-protected:
-    // 测试友元类
-    friend class AudioEncoderTestable;
 };

@@ -207,9 +207,9 @@ void AudioEncoder::encodeLoop() {
         while (audioBuffer.size() >= 512 * 2) {
 
             //将音频数据重采样为480 samples
-            //size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
+            size_t resampledBatch = resample(audioBuffer, sampledAudioBuffer, AUDIO_RESAMPLE_RATIO, 512, 480);
             
-            size_t resampledBatch = audioBuffer.size() / (480 * 2);
+            //size_t resampledBatch = audioBuffer.size() / (480 * 2);
 
             for (size_t i = 0; i < resampledBatch; i++) {
                 // 从累积缓冲区取出足够的数据进行编码
@@ -243,8 +243,8 @@ void AudioEncoder::encodeLoop() {
                 }
             }
 
-            audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + 480 * 2 * resampledBatch);
-            //sampledAudioBuffer.clear();
+            //audioBuffer.erase(audioBuffer.begin(), audioBuffer.begin() + 480 * 2 * resampledBatch);
+            sampledAudioBuffer.clear();
         }
         
         // 重采样触觉数据（只有当缓冲区有足够数据时）

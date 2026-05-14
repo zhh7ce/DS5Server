@@ -54,3 +54,7 @@ target_compile_options(ds5server PRIVATE
     -g              # 添加调试符号
     -O0             # 关闭优化，方便调试
 )
+
+# 添加测试子目录
+enable_testing()
+add_subdirectory(tests)
