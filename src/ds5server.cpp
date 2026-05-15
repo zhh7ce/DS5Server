@@ -42,6 +42,17 @@ bool DS5Server::initialize()
             return false;
         }
 
+        m_usbSink = std::make_unique<USBSink>();
+        if (!m_usbSink) {
+            std::cerr << "[DS5Server] Failed to create USBSink object" << std::endl;
+            return false;
+        }
+
+        if (!m_usbSink->init()) {
+            std::cerr << "[DS5Server] Failed to initialize USBSink" << std::endl;
+            return false;
+        }
+
         // 设置 AudioSink 的停止回调，转发到 DS5Server 的回调
         m_audioSink->setStopCallback([this]() {
             if (m_stopCallback) {
@@ -52,6 +63,11 @@ bool DS5Server::initialize()
         // 设置 AudioSink 的音频数据回调
         m_audioSink->setAudioSinkDataCallback([this](const float* data, uint32_t frames, uint32_t channels) {
             this->onAudioSinkData(data, frames, channels);
+        });
+
+        // 设置EncodeCallback
+        m_audioEncoder->setEncodeCallback([this]() {
+            this->onEncodeData();
         });
 
         std::cout << "[DS5Server] Initialized successfully with AudioSink and AudioEncoder" << std::endl;
@@ -101,6 +117,17 @@ void DS5Server::stop()
     } else {
         std::cout << "[DS5Server::stop] AudioSink object is null, skipping" << std::endl;
     }
+
+    if (m_usbSink) {
+        std::cout << "[DS5Server::stop] Calling USBSink::stop()..." << std::endl;
+        m_usbSink->stop();
+        std::cout << "[DS5Server::stop] USBSink service stopped" << std::endl;
+    } else {
+        std::cout << "[DS5Server::stop] USBSink object is null, skipping" << std::endl;
+    }
+
+    if (m_file.is_open())
+        m_file.close();
     
     std::cout << "[DS5Server::stop] Stop process completed" << std::endl;
 }
@@ -118,6 +145,18 @@ void DS5Server::onAudioSinkData(const float* data, uint32_t frames, uint32_t cha
 
     // 传递4通道数据给编码器，内部会自动分离处理
     m_audioEncoder->processFrame(data, frames);
+}
+
+void DS5Server::onEncodeData()
+{
+    std::vector<uint8_t> audioData;
+
+    m_audioEncoder->getEncodedAudioData(audioData);
+
+    if (!audioData.empty()){
+        m_usbSink->write(audioData.data(), audioData.size());
+        std::cout << "[DS5Server::onEncodeData] Wrote " << audioData.size() << " bytes of audio data" << std::endl;
+    }
 }
 
 const std::string& DS5Server::getDeviceId() const

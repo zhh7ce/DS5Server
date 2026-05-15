@@ -18,10 +18,14 @@ pkg_check_modules(SAMPLERATE REQUIRED samplerate)
 # 查找 Boost 库（只需要 header-only 的 circular_buffer）
 find_package(Boost REQUIRED)
 
+# 查找 libusb-1.0 库
+pkg_check_modules(LIBUSB REQUIRED libusb-1.0)
+
 # 添加可执行文件
 add_executable(ds5server
     src/main.cpp
     src/audio_sink.cpp
+    src/usb_sink.cpp
     src/ds5server.cpp
     src/audio_encoder.cpp
     src/opus_output.cpp
@@ -33,6 +37,7 @@ target_include_directories(ds5server PRIVATE
     ${SPA_INCLUDE_DIRS}
     ${OPUS_INCLUDE_DIRS}
     ${SAMPLERATE_INCLUDE_DIRS}
+    ${LIBUSB_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${CMAKE_SOURCE_DIR}/src
 )
@@ -43,6 +48,7 @@ target_link_libraries(ds5server PRIVATE
     ${SPA_LIBRARIES}
     ${OPUS_LIBRARIES}
     ${SAMPLERATE_LIBRARIES}
+    ${LIBUSB_LIBRARIES}
     pthread
 )
 

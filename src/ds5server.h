@@ -2,6 +2,7 @@
 
 #include "audio_sink.h"
 #include "audio_encoder.h"
+#include "usb_sink.h"
 #include <string>
 #include <memory>
 #include <functional>
@@ -58,9 +59,12 @@ public:
      */
     void onAudioSinkData(const float* data, uint32_t frames, uint32_t channels);
 
+    void onEncodeData();
+
 private:
     std::string m_deviceId;
     std::unique_ptr<AudioSink> m_audioSink;  // AudioSink 对象
     std::unique_ptr<AudioEncoder> m_audioEncoder;  // AudioEncoder 对象
+    std::unique_ptr<USBSink> m_usbSink;  // USBSink 对象
     StopCallback m_stopCallback;    // 状态回调
 };

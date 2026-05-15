@@ -92,8 +92,6 @@ bool AudioEncoder::init(uint32_t sampleRate,
     std::cout << "  Haptics sample rate: " << hapticsSampleRate << " Hz" << std::endl;
     std::cout << "  Bitrate: " << bitrate << " bps" << std::endl;
 
-    m_opusOutput.init("audio.opus", audioSampleRate, audioChannels);
-
     return true;
 }
 
@@ -117,30 +115,37 @@ void AudioEncoder::setEncodeCallback(EncodeCallback callback) {
     m_encodeCallback = std::move(callback);
 }
 
-std::vector<uint8_t> AudioEncoder::getEncodedAudioData() {
+bool AudioEncoder::getEncodedAudioData(std::vector<uint8_t>& data) {
     std::lock_guard<std::mutex> lock(m_outputAudioMutex);
     if (m_outputAudioBuffer.size() < MAX_AUDIO_SIZE) {
-        return {};
+        return false;
     }
 
-    size_t outCount = m_outputAudioBuffer.size() / MAX_AUDIO_SIZE * MAX_AUDIO_SIZE;
-    std::vector<uint8_t> result(m_outputAudioBuffer.begin(), m_outputAudioBuffer.begin() + outCount);
-    m_outputAudioBuffer.erase_begin(outCount);
+    if (m_outputHapticsBuffer.size() < MAX_HAPTIC_SIZE) {
+        static uint8_t zeroData[MAX_HAPTIC_SIZE];
+        data.insert(data.end(), zeroData, zeroData + MAX_HAPTIC_SIZE);
+    } else {
+        data.insert(data.end(), m_outputHapticsBuffer.begin(), m_outputHapticsBuffer.begin() + MAX_HAPTIC_SIZE);
+        m_outputHapticsBuffer.erase_begin(MAX_HAPTIC_SIZE);
+    }
 
-    return result;
+    data.insert(data.end(), m_outputAudioBuffer.begin(), m_outputAudioBuffer.begin() + MAX_AUDIO_SIZE);
+    m_outputAudioBuffer.erase_begin(MAX_AUDIO_SIZE);
+
+    return true;
 }
 
-std::vector<uint8_t> AudioEncoder::getEncodedHapticsData() {
+bool AudioEncoder::getEncodedHapticsData(std::vector<uint8_t>& data) {
     std::lock_guard<std::mutex> lock(m_outputHapticsMutex);
     if (m_outputHapticsBuffer.size() < MAX_HAPTIC_SIZE) {
-        return {};
+        return false;
     }
 
     size_t outCount = m_outputHapticsBuffer.size() / MAX_HAPTIC_SIZE * MAX_HAPTIC_SIZE;
-    std::vector<uint8_t> result(m_outputHapticsBuffer.begin(), m_outputHapticsBuffer.begin() + outCount);
+    data.insert(data.end(), m_outputHapticsBuffer.begin(), m_outputHapticsBuffer.begin() + outCount);
     m_outputHapticsBuffer.erase_begin(outCount);
 
-    return result;
+    return true;
 }
 
 void AudioEncoder::stop() {
@@ -154,9 +159,6 @@ void AudioEncoder::stop() {
     if (m_encodeThread.joinable()) {
         m_encodeThread.join();
     }
-
-    // 停止文件输出
-    m_opusOutput.close();
 
     // 清理 Opus 编码器
     if (m_opusEncoder) {
@@ -240,15 +242,10 @@ void AudioEncoder::encodeLoop() {
                         m_outputAudioBuffer.insert(m_outputAudioBuffer.end(), encodeAudioBuffer.begin(), encodeAudioBuffer.end());
                     }
 
-                    // 如果启用了文件输出，使用 OpusOutput 写入数据包
-                    if (m_opusOutput.isOpen()) {
-                        m_opusOutput.writePacket(encodeAudioBuffer.data(), encodedBytes, m_config.frameSize);
-                    }
-
                     // 触发回调
-                    if (m_encodeCallback) {
-                        m_encodeCallback();
-                    }
+                    // if (m_encodeCallback) {
+                    //     m_encodeCallback();
+                    // }
                 } else {
                     std::cerr << "[AudioEncoder] Opus encode failed: "
                             << opus_strerror(encodedBytes) << std::endl;

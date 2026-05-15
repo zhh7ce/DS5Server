@@ -61,13 +61,13 @@ public:
      * @brief 获取已编码的音频数据包
      * @return 编码后的音频数据队列
      */
-    std::vector<uint8_t> getEncodedAudioData();
+    bool getEncodedAudioData(std::vector<uint8_t>& data);
 
     /**
      * @brief 获取已编码的触觉数据包
      * @return 编码后的触觉数据队列
      */
-    std::vector<uint8_t> getEncodedHapticsData();
+    bool getEncodedHapticsData(std::vector<uint8_t>& data);
 
     /**
      * @brief 停止编码器并清理资源
@@ -115,7 +115,4 @@ private:
 
     // 回调
     EncodeCallback m_encodeCallback;
-
-    // Ogg Opus 文件输出
-    OpusOutput m_opusOutput;
 };
