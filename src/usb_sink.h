@@ -3,6 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <functional>
 
 // libusb 前置声明
 struct libusb_context;
@@ -10,6 +11,9 @@ struct libusb_device_handle;
 
 class USBSink {
 public:
+    // 停止回调
+    using StopCallback = std::function<void()>;
+
     /**
      * @brief 构造函数
      */
@@ -34,6 +38,12 @@ public:
     void stop();
 
     /**
+     * @brief 设置停止回调
+     * @param callback 当需要停止时调用
+     */
+    void setStopCallback(StopCallback callback);
+
+    /**
      * @brief 写入数据到 USB 设备
      * @param data 数据指针
      * @param size 数据大小
@@ -56,6 +66,9 @@ private:
 
     // 内部状态
     bool m_initialized = false;
+
+    // 停止回调
+    StopCallback m_stopCallback;
 
     // 内部方法
     bool findOutEndpoint();

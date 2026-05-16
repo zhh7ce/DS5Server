@@ -65,6 +65,13 @@ bool DS5Server::initialize()
             this->onAudioSinkData(data, frames, channels);
         });
 
+        // 设置 USBSink 的停止回调，转发到 DS5Server 的回调
+        m_usbSink->setStopCallback([this]() {
+            if (m_stopCallback) {
+                m_stopCallback();
+            }
+        });
+
         // 设置EncodeCallback
         m_audioEncoder->setEncodeCallback([this]() {
             this->onEncodeData();

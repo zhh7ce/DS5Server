@@ -97,6 +97,11 @@ void USBSink::stop()
     std::cout << "[USBSink::stop] Cleanup completed" << std::endl;
 }
 
+void USBSink::setStopCallback(StopCallback callback)
+{
+    m_stopCallback = std::move(callback);
+}
+
 bool USBSink::write(const uint8_t* data, uint32_t size)
 {
     if (!m_initialized || !m_handle) {
@@ -128,12 +133,14 @@ bool USBSink::write(const uint8_t* data, uint32_t size)
     if (rc != 0) {
         std::cerr << "[USBSink::write] Transfer failed: " << libusb_error_name(rc) 
                   << " (transferred: " << transferred << "/" << size << ")" << std::endl;
+        if (m_stopCallback) m_stopCallback();
         return false;
     }
 
     if (static_cast<uint32_t>(transferred) != size) {
         std::cerr << "[USBSink::write] Incomplete transfer: " << transferred 
                   << "/" << size << " bytes" << std::endl;
+        if (m_stopCallback) m_stopCallback();
         return false;
     }
 
