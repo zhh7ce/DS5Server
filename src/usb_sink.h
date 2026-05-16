@@ -26,7 +26,7 @@ public:
      */
     bool init(uint16_t vendorId = 0x054C, 
               uint16_t productId = 0x0CE6, 
-              uint8_t interfaceNum = 4);
+              uint8_t interfaceNum = 1);
 
     /**
      * @brief 停止并断开 USB 设备

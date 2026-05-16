@@ -61,7 +61,37 @@ bool AudioSink::start()
         PW_KEY_NODE_DESCRIPTION, m_config.nodeDescription.c_str(),
         PW_KEY_MEDIA_ROLE, "Music",
         PW_KEY_DEVICE_ICON_NAME, "audio-card",
-        "alsa.components", m_config.alsaComponents.c_str(),
+
+        // === 真实设备的关键属性 ===
+        "device.api", "alsa",                                    // 伪装成 ALSA 设备
+        "device.bus", "usb",                                     // 伪装成 USB 设备
+        "device.bus-path", "pci-0000:03:00.0-usb-0:3:1.0",      // 更真实的USB路径
+        "device.form_factor", "speaker",                         // 设备形态
+        "device.product.id", "0ce6",                             // DS5产品ID
+        "device.product.name", "DualSense Wireless Controller",  // 产品名称
+        "device.vendor.id", "054c",                              // Sony厂商ID
+        "device.vendor.name", "Sony Interactive Entertainment",  // 厂商名称
+        "device.serial", "00:00:00:00:00:00",                   // 序列号（可动态生成）
+        "audio.channels", "4",                                   // 4 声道（环绕声）
+        "audio.position", "[ FL, FR, RL, RR ]",                 // 声道布局
+        
+        // === ALSA 相关属性（重要！）===
+        "alsa.card_name", "DualSense Wireless Controller",      // 声卡名称
+        "alsa.long_card_name", "Sony Interactive Entertainment DualSense Wireless Controller at usb-0000:03:00.0-3/input0", // 完整名称
+        "alsa.components", m_config.alsaComponents.c_str(),                      // USB VID:PID
+        "alsa.mixer_name", "USB Mixer",
+        "alsa.name", "USB Audio",
+        "alsa.resolution_bits", "16",
+        "alsa.driver_name", "snd_usb_audio",                    // ALSA驱动名称
+        
+        // === 设备路径伪装 ===
+        "api.alsa.path", "surround40:3",                         // 假装是 surround40 设备
+        "object.path", "alsa:acp:DualSense:playback",           // 对象路径
+        "object.linger", "true",                                 // 保持连接
+        
+        // === 优先级（让系统优先选它）===
+        "priority.driver", "1109",
+        "priority.session", "1109",
         "node.volume", "1.0",
         // 低延迟优化配置
         "node.latency", "48/48000",  // 设置最小延迟：48帧 @ 48kHz = 1ms

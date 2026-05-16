@@ -125,9 +125,6 @@ void DS5Server::stop()
     } else {
         std::cout << "[DS5Server::stop] USBSink object is null, skipping" << std::endl;
     }
-
-    if (m_file.is_open())
-        m_file.close();
     
     std::cout << "[DS5Server::stop] Stop process completed" << std::endl;
 }
@@ -150,12 +147,10 @@ void DS5Server::onAudioSinkData(const float* data, uint32_t frames, uint32_t cha
 void DS5Server::onEncodeData()
 {
     std::vector<uint8_t> audioData;
-
     m_audioEncoder->getEncodedAudioData(audioData);
 
     if (!audioData.empty()){
         m_usbSink->write(audioData.data(), audioData.size());
-        std::cout << "[DS5Server::onEncodeData] Wrote " << audioData.size() << " bytes of audio data" << std::endl;
     }
 }
 
