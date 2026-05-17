@@ -59,11 +59,8 @@ bool AudioSink::start()
         PW_KEY_NODE_NAME, m_config.nodeName.c_str(),
         PW_KEY_NODE_NICK, m_config.nodeNick.c_str(),
         PW_KEY_NODE_DESCRIPTION, m_config.nodeDescription.c_str(),
-        PW_KEY_MEDIA_ROLE, "Music",
+        PW_KEY_MEDIA_ROLE, "Game",
         PW_KEY_DEVICE_ICON_NAME, "audio-card",
-
-        "audio.channels", "4",                  // 4 声道（环绕声）
-        "audio.position", "[ FL, FR, RL, RR ]", // 声道布局
         
         "node.latency", "48/48000",             // 设置最小延迟：48帧 @ 48kHz = 1ms
         "clock.quantum", "48",                  // 最小量子大小
@@ -116,6 +113,10 @@ bool AudioSink::start()
     audioInfo.format = SPA_AUDIO_FORMAT_F32_LE;
     audioInfo.rate = m_config.sampleRate;
     audioInfo.channels = m_config.channels;
+    audioInfo.position[0] = SPA_AUDIO_CHANNEL_FL;  // 左前
+    audioInfo.position[1] = SPA_AUDIO_CHANNEL_FR;  // 右前
+    audioInfo.position[2] = SPA_AUDIO_CHANNEL_RL;  // 左后
+    audioInfo.position[3] = SPA_AUDIO_CHANNEL_RR;  // 右后
     
     const struct spa_pod* params[1];
     params[0] = spa_format_audio_raw_build(

@@ -58,9 +58,9 @@ private:
     struct Config {
         std::string alsaComponents = "USB054c:0ce6";
         std::string mediaClass = "Audio/Sink";  // 修改为 Sink（输出设备）
-        std::string nodeDescription = "DualSense wireless controller (PS5) ";
-        std::string nodeName = "alsa_output.hw_Controller_";
-        std::string nodeNick = "DualSense wireless controller ";
+        std::string nodeDescription = "DualSense Wireless Controller (PS5) ";
+        std::string nodeName = "alsa_output.Sony_Interactive_Entertainment_DualSense_Wireless_Controller_";
+        std::string nodeNick = "DualSense Wireless Controller ";
         uint32_t sampleRate = 48000;
         uint32_t channels = 4;
     } m_config;
