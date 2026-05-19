@@ -29,6 +29,18 @@ make
 
 程序会创建一个名为 "DualSense Wireless Controller" 的虚拟音频设备，系统会将音频输出到此设备，DS5Server 接收音频数据编码后发送到DS5Dongle。
 
+## 自动启动
+
+可以将编译好的文件复制到对应目录，通过systemd自动启动。或使用udev规则，在手柄连接后自动运行。
+
+```bash
+# 启用服务（开机自启）
+systemctl --user enable ds5server.service
+
+# 立即启动服务
+systemctl --user start ds5server.service
+```
+
 ## 配套客户端
 
 本项目需要配合 [DS5Dongle](https://github.com/zhh7ce/DS5Dongle) 的 `client` 分支使用。

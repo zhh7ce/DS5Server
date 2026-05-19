@@ -54,7 +54,7 @@ private:
     struct pw_core* m_core = nullptr;
     struct pw_stream* m_stream = nullptr;
 
-    // 配置参数（基于 ds5.txt）
+    // 配置参数
     struct Config {
         std::string alsaComponents = "USB054c:0ce6";
         std::string mediaClass = "Audio/Sink";  // 修改为 Sink（输出设备）
